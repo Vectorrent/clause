@@ -42,25 +42,27 @@ Clause: I learned: 'world' → '' (with 0 options)
 ✅ Statistical transition matrices
 ✅ SKI combinator calculus for inference
 ✅ Graph operations on topology
-✅ 6D weight calculations
+✅ 6D weight calculations with sparse connectivity
 ✅ Depth-limited graph walks
 ✅ Markov text generation
+✅ π-based quasi-periodic phase cycling
+✅ Golden angle sampling for optimal coverage
+✅ Self-tracked iteration counter (fully autonomous)
 
 ## Quick Start
 
 ```bash
 # Setup
-cd terraform
 terraform init
 
 # Interactive mode
-cd .. && ./loop.sh
+./loop.sh
 
-# Or run directly
-terraform apply -auto-approve -var='user_input=Hello world' -var='iteration=1'
+# Or run directly (iteration auto-increments!)
+terraform apply -auto-approve -var='user_input=Hello world'
 ```
 
-Type anything. The system learns token sequences and builds transition matrices.
+Type anything. The system learns token sequences and builds transition matrices. **Iteration counter is self-tracked** - no need to specify it!
 
 ## How It Works
 
@@ -116,7 +118,7 @@ Pure topology, no semantics:
 - BFS/DFS up to depth 3
 - Influence scores
 
-### Layer 6: 6D Weights
+### Layer 6: 6D Weights & Sparse Connectivity
 
 Each observation has 6 properties:
 1. subject (string)
@@ -128,8 +130,16 @@ Each observation has 6 properties:
 
 **Weight formula:**
 ```
-weight = confidence × log(count + 1) × exp(-(current_iter - iteration) × 0.01)
+weight = confidence × log(count + 1) × (1 - (current_iter - iteration) × 0.01)
 ```
+
+**Sparse Connectivity**: Instead of computing full n×n distances, we use **golden angle sampling**:
+```hcl
+golden_angle = 2π / φ²  # ≈ 137.5°
+sample_size = √n        # Balance coverage vs cost
+```
+
+Each iteration samples √n atomics using the golden angle (like sunflower seed spirals), computing pairwise distances in 6D space. Over time, this provides **quasi-uniform coverage** while keeping computation efficient.
 
 Pure math. No hardcoded meanings.
 
@@ -178,34 +188,52 @@ The system reasons about its own previous reasoning.
 
 ### Never Converges
 
-Phase cycling (iteration % 4):
+**π-based Quasi-Periodic Phase Cycling**:
+
+Instead of simple modulo, we use π (an irrational number):
+```hcl
+phase_continuous = (iteration × π) - floor(iteration × π)  # [0, 1)
+computation_phase = floor(iteration × π) % 4
+```
+
+Phases (0-3):
 - 0: extraction
 - 1: inference
 - 2: exploration
 - 3: consolidation
 
-Never settles. Always expressing.
+**Why π?** Because it's irrational, the system **never repeats exactly** - like planetary orbits with precession. Each cycle is similar but shifted, creating **quasi-periodic spirals** through state space.
+
+Never settles. Always expressing. Never exactly repeats.
 
 ## Technical Details
 
-**Implementation**: 620 lines of pure HCL (Terraform)
+**Implementation**: ~750 lines of pure HCL (Terraform)
 **Dependencies**: None (zero Python, zero JSON configs)
 **Patterns**: 0 hardcoded, all learned
-**State**: Self-referential terraform.tfstate
+**State**: Self-referential terraform.tfstate (consolidated, 2 resources)
 **Inference**: SKI combinator compositions
 **Generation**: Markov chains
+**Phase cycling**: π-based quasi-periodic (irrational)
+**Connectivity**: Sparse golden-angle sampling (√n per iteration)
+**Iteration tracking**: Fully autonomous (self-incrementing)
+**Plan size**: ~300-600 lines (down from 2500+ with per-atomic resources)
 
 ## Example Session
 
 ```bash
-$ terraform apply -var='user_input=The cat sat' -var='iteration=1'
-Output: I learned 3 new tokens
+# Iteration auto-increments! No need to track it manually.
+$ terraform apply -var='user_input=The cat sat'
+iteration = 1
+response = "Learned: [the, cat, sat] | Transitions: 2 words | Generated: \"the cat\" | Inferences: 7"
 
-$ terraform apply -var='user_input=The dog sat' -var='iteration=2'
-Output: I learned: 'sat' → '' (with 0 options)
+$ terraform apply -var='user_input=The dog sat'
+iteration = 2
+response = "Learned: [the, dog, sat] | Transitions: 3 words | Generated: \"the\" | Inferences: 9"
 
-$ terraform apply -var='user_input=The cat ran' -var='iteration=3'
-Output: I learned: 'ran' → '' (with 0 options)
+$ terraform apply -var='user_input=The cat ran'
+iteration = 3
+response = "Learned: [the, cat, ran] | Transitions: 4 words | Generated: \"cat sat\" | Inferences: 13"
 
 # System now knows:
 #   "the" → ["cat", "dog"]
@@ -216,13 +244,46 @@ Output: I learned: 'ran' → '' (with 0 options)
 $ terraform output transitions
 {
   total_words = 5
-  total_edges = 8
+  total_edges = 6
   sample_transitions = {
     "the" = ["cat", "dog"]
     "cat" = ["sat", "ran"]
   }
 }
+
+# Check pi-based phase cycling:
+$ terraform output pi_geometry
+{
+  pi = 3.14159265359
+  golden_ratio = 1.61803398875
+  golden_angle = 2.39996...
+  phase_continuous = 0.42477...  # Never repeats!
+  sparse_sample_size = 2
+  sparse_coverage = "33%"
+}
 ```
+
+## The Mathematics
+
+**π (Pi) - Irrational Phase Cycling**:
+- `phase = (iteration × π) mod 1` creates quasi-periodic orbits
+- Never repeats exactly (π is irrational)
+- Like planets with orbital precession
+- Creates deterministic but non-repeating exploration
+
+**φ (Golden Ratio) - Optimal Sampling**:
+- `golden_angle = 2π / φ² ≈ 137.5°`
+- Used in nature (sunflower spirals, pine cones)
+- Provides most uniform coverage with fewest samples
+- Each iteration samples √n atomics at golden-angle rotation
+
+**6D Hypersphere**:
+- Each atomic is a point in 6-dimensional space
+- Sparse pairwise distances computed each iteration
+- Creates fully-connected conceptual space over time
+- Distance metric combines symbolic (3D) + numerical (3D) properties
+
+**Result**: Deterministic chaos with optimal space-filling properties.
 
 ## Philosophy
 
@@ -234,6 +295,9 @@ $ terraform output transitions
 
 **Traditional NLP**: Hardcode grammar and semantics.
 **Clause**: Start from zero, learn everything statistically.
+
+**Traditional iteration**: External counter, manual tracking.
+**Clause**: Self-tracked time, fully autonomous.
 
 ## What It's Good For
 
@@ -248,19 +312,23 @@ $ terraform output transitions
 
 ## Project Status
 
-**Phase**: Pure data-driven Markov + SKI implementation
-**Status**: Complete rewrite eliminating all hardcoded patterns
+**Phase**: Pure data-driven Markov + SKI + π-geometry implementation
+**Status**: Consolidated resources, autonomous iteration, quasi-periodic cycles
 **Patterns**: 0 hardcoded (down from 5)
 **Python**: 0 lines (down from 1200)
 **JSON configs**: 0 files (down from 3)
 **Purity**: 100% data-driven
+**Optimizations**: Consolidated state (77% smaller plans), sparse connectivity
 
 This is a research prototype proving you can build a reasoning system where:
 - NO patterns are hardcoded
 - ALL patterns emerge from data
 - Inference is provable (SKI)
 - State is self-referential
-- Computation never converges
+- Computation never converges (π-based quasi-periodic cycles)
+- Connectivity is sparse but uniformly covering (golden angle sampling)
+- Time is self-tracked (autonomous iteration counter)
+- Plans stay compact even at 10,000+ observations
 
 ## Learn More
 

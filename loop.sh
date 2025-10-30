@@ -5,8 +5,6 @@
 
 set -e
 
-ITERATION=0
-
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -32,8 +30,6 @@ if [ ! -d ".terraform" ]; then
 fi
 
 while true; do
-  ITERATION=$((ITERATION + 1))
-
   # Get user input (THE CLAUSE)
   echo -ne "${BLUE}You: ${NC}"
   read -r USER_INPUT
@@ -73,13 +69,12 @@ while true; do
 
   # Write input to Terraform variable file
   cat > "input.auto.tfvars" <<EOF
-iteration = $ITERATION
 user_input = "$USER_INPUT"
 EOF
 
   # Generate plan and save to file (for review) - strip ANSI codes
   echo -ne "${GRAY}[Planning...]${NC}\r"
-  terraform plan -out=tfplan.binary 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > PLAN.txt
+  terraform plan -no-color -out=tfplan.binary > PLAN.txt 2>&1
 
   # Apply terraform (suppress noise)
   echo -ne "${GRAY}[Applying...]${NC}\r"
