@@ -305,6 +305,42 @@ locals {
       ) if key_a != key_b
     }
   } : {}
+
+  # ========================================================================
+  # Bidirectional Weight Propagation (Lion-optimizer inspired)
+  # ========================================================================
+  # Forward pass: Normal weights (attraction)
+  # Backward pass: Sign-flipped weights (repulsion/perturbation)
+  # This explores both "what is" and "what is NOT" simultaneously
+
+  # Determine which phase we're in (even/odd iterations alternate)
+  weight_sign = local.iteration % 2 == 0 ? 1 : -1
+
+  # Apply sign to sparse distances (bidirectional flow)
+  signed_sparse_distances = {
+    for key_a, distances in local.sparse_pairwise_distances :
+    key_a => {
+      for key_b, dist in distances :
+      # Forward (even): positive influence (attraction)
+      # Backward (odd): negative influence (repulsion/anti-pattern)
+      key_b => dist * local.weight_sign
+    }
+  }
+
+  # Weight adjustments from bidirectional flow
+  # Accumulate influences across all sparse connections
+  weight_adjustments = local.num_atomics > 0 ? {
+    for atomic_key in local.all_atomic_keys :
+    atomic_key => sum(flatten([
+      for sampler_key, distances in local.signed_sparse_distances : [
+        for target_key, signed_dist in distances :
+        signed_dist if target_key == atomic_key
+      ]
+    ]))
+  } : {}
+
+  # Bidirectional phase name
+  bidirectional_phase = local.weight_sign > 0 ? "forward_attract" : "backward_repel"
 }
 
 # ============================================================================
@@ -714,12 +750,14 @@ output "inference" {
 
 output "recurrence" {
   value = {
-    iteration        = local.iteration
-    phase_discrete   = local.computation_phase
-    phase_continuous = local.phase_continuous
-    phase_angle_rad  = local.phase_angle
-    attention        = local.attention_mode
-    triggered        = null_resource.recurrent_pass.id
+    iteration          = local.iteration
+    phase_discrete     = local.computation_phase
+    phase_continuous   = local.phase_continuous
+    phase_angle_rad    = local.phase_angle
+    attention          = local.attention_mode
+    bidirectional      = local.bidirectional_phase
+    weight_sign        = local.weight_sign
+    triggered          = null_resource.recurrent_pass.id
   }
 }
 
@@ -737,12 +775,18 @@ output "pi_geometry" {
 
 output "sparse_connectivity" {
   value = {
-    total_atomics         = local.num_atomics
-    sampled_this_iter     = length(local.sparse_sampled_atomics)
-    sample_keys           = keys(local.sparse_sampled_atomics)
-    sample_count          = length(local.sparse_pairwise_distances)
+    total_atomics          = local.num_atomics
+    sampled_this_iter      = length(local.sparse_sampled_atomics)
+    sample_keys            = keys(local.sparse_sampled_atomics)
+    sample_count           = length(local.sparse_pairwise_distances)
+    bidirectional_phase    = local.bidirectional_phase
+    weight_sign            = local.weight_sign
     showing_full_distances = local.num_atomics <= 20
-    pairwise_distances    = local.num_atomics <= 20 ? local.sparse_pairwise_distances : {}
+    pairwise_distances     = local.num_atomics <= 20 ? local.sparse_pairwise_distances : {}
+    weight_adjustments     = local.num_atomics <= 10 ? local.weight_adjustments : {
+      note = "Too many atomics, showing summary only"
+      total_adjustment = local.num_atomics > 0 ? sum(values(local.weight_adjustments)) : 0
+    }
   }
 }
 

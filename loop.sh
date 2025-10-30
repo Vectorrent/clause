@@ -94,6 +94,5 @@ EOF
   # Show response immediately
   RESPONSE=$(terraform output -raw response 2>/dev/null || echo "")
   echo -e "${GREEN}Clause: ${NC}$RESPONSE"
-  echo -e "${GRAY}  (see PLAN.txt for detailed state changes)${NC}"
   echo ""
 done
